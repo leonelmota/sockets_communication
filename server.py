@@ -18,29 +18,32 @@ def process_msg(msg : str) -> str:
     print(msg_split)
     equipment = msg_split[-1]
     global number_of_sensors
-    if equipment not in valid_equipments:
-        return "invalid equipment"
+    
     if msg_split[:2] == ['add', 'sensor']:
-        idx = 2
+        if equipment not in valid_equipments:
+            return "invalid equipment"
+
         sensors = msg_split[2:-2]
+
         for sensor in sensors:
             if sensor not in valid_sensors:
                 return "invalid sensor"
-        sensors_str = ' '.join(sensors)
-        instaled_sensors = [s for s in sensors if s in sensors_in_equipments[equipment]]
-        if len(instaled_sensors):
-            instaled_sensors_str = ' '.join(instaled_sensors)
-            return_msg = f"sensor {instaled_sensors_str} already exists in {equipment}"
+        
+        installed_sensors = [s for s in sensors if s in sensors_in_equipments[equipment]]
+        if len(installed_sensors):
+            return_msg = f"sensor {' '.join(installed_sensors)} already exists in {equipment}"
         else:
-            for sensor in sensors:
+            for sensor in list(set(sensors)):
                 sensors_in_equipments[equipment].append(sensor)
                 number_of_sensors+=1
-            return_msg = f"sensor {sensors_str} added"
+            return_msg = f"sensor {' '.join(sensors)} added"
         if number_of_sensors > 15:
             return_msg = "limit exceeded"
         return return_msg
 
     elif msg_split[:2] == ['remove', 'sensor']:
+        if equipment not in valid_equipments:
+            return "invalid equipment"
         sensor = msg_split[2]
         if sensor in sensors_in_equipments[equipment]:
             sensors_in_equipments[equipment].remove(sensor)
@@ -50,6 +53,8 @@ def process_msg(msg : str) -> str:
             return f"sensor {sensor} does not exist in {equipment}"
         
     elif msg_split[:3] == ['list', 'sensors', 'in']:
+        if equipment not in valid_equipments:
+            return "invalid equipment"
         if len(sensors_in_equipments[equipment]) == 0:
             return "none"
         else:
@@ -59,9 +64,11 @@ def process_msg(msg : str) -> str:
             return return_msg.strip()
     
     elif msg_split[0] == 'read' and msg_split[-2] == 'in':
+        if equipment not in valid_equipments:
+            return "invalid equipment"
         sensors = msg_split[1: -2]
         not_installed_sensors = [s for s in sensors if s not in sensors_in_equipments[equipment]]
-        #print("not installed sensors ",not_installed_sensors)
+        
         if len(not_installed_sensors):
             not_installed_sensors_str = ' '.join(not_installed_sensors)
             return_msg = f"sensor(s) {not_installed_sensors_str} not installed"
@@ -80,19 +87,28 @@ if __name__ == '__main__':
 
     AF = socket.AF_INET if IP_VERSION == 'v4' else socket.AF_INET6
 
+    running_server = True
+    
     with socket.socket(AF, socket.SOCK_STREAM) as s:
         s.bind(('', PORT))
-        s.listen()
-        conn, addr = s.accept()
-        with conn:
-            print(f"Connected by {addr}")
-            while True:
-                data = conn.recv(500)
-                msg = data.decode()
-                if msg == "kill":
-                    break
-                return_msg = process_msg(msg)
-                if not return_msg:
-                    break
-                print(msg)
-                conn.sendall(return_msg.encode())
+
+        while running_server:      
+            s.listen()
+            conn, addr = s.accept()
+            with conn:
+                print(f"Connected by {addr}")
+                while True:
+                    data = conn.recv(500)
+                    msg = data.decode()
+                    if msg == "kill":
+                        running_server = False
+                        break
+                    else:
+                        return_msg = process_msg(msg)
+
+                    if not return_msg:
+                        break
+                    print(msg)
+                    print("return", return_msg)
+
+                    conn.sendall(return_msg.encode())

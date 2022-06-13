@@ -20,5 +20,8 @@ if __name__ == "__main__":
             s.sendall(msg)
             
             recv_data = s.recv(500)
+            if not recv_data:
+                s.close()
+                break
             recv_msg = recv_data.decode()
             print(f"received {recv_msg}")
