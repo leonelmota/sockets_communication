@@ -2,6 +2,7 @@ import socket
 import sys
 import random
 from typing import List
+from collections import OrderedDict
 
 sensors_in_equipments = {'01': [], '02': [], '03': [], '04': []}
 valid_sensors = ['01', '02', '03', '04']
@@ -15,25 +16,19 @@ def get_random_numbers_str(size : int) -> List[str]:
 
 def process_msg(msg : str) -> str:
     msg_split = msg.split(' ')
-    print(msg_split)
     equipment = msg_split[-1]
     global number_of_sensors
     
     if msg_split[:2] == ['add', 'sensor']:
         if equipment not in valid_equipments:
             return "invalid equipment"
-
         sensors = msg_split[2:-2]
-
-        for sensor in sensors:
-            if sensor not in valid_sensors:
-                return "invalid sensor"
         
         installed_sensors = [s for s in sensors if s in sensors_in_equipments[equipment]]
         if len(installed_sensors):
             return_msg = f"sensor {' '.join(installed_sensors)} already exists in {equipment}"
         else:
-            for sensor in list(set(sensors)):
+            for sensor in list(OrderedDict.fromkeys(sensors)):
                 sensors_in_equipments[equipment].append(sensor)
                 number_of_sensors+=1
             return_msg = f"sensor {' '.join(sensors)} added"
@@ -44,13 +39,17 @@ def process_msg(msg : str) -> str:
     elif msg_split[:2] == ['remove', 'sensor']:
         if equipment not in valid_equipments:
             return "invalid equipment"
-        sensor = msg_split[2]
-        if sensor in sensors_in_equipments[equipment]:
+
+        sensors = msg_split[2:-2]
+        not_installed_sensors = [s for s in sensors if s not in sensors_in_equipments[equipment]]
+        if len(not_installed_sensors):
+            return f"sensor {' '.join(not_installed_sensors)} does not exist in {equipment}"
+        
+        for sensor in sensors:
             sensors_in_equipments[equipment].remove(sensor)
             number_of_sensors -= 1
-            return f"sensor {sensor} removed"
-        else:
-            return f"sensor {sensor} does not exist in {equipment}"
+        return f"sensor {' '.join(sensors)} removed"
+
         
     elif msg_split[:3] == ['list', 'sensors', 'in']:
         if equipment not in valid_equipments:
@@ -80,16 +79,22 @@ def process_msg(msg : str) -> str:
     else:
         return ''
     
-
-if __name__ == '__main__':
+def main():
     IP_VERSION = sys.argv[1]
     PORT = int(sys.argv[2])
 
-    AF = socket.AF_INET if IP_VERSION == 'v4' else socket.AF_INET6
+    if IP_VERSION == 'v4':
+        AF = socket.AF_INET 
+    elif IP_VERSION == 'v6':
+        AF = socket.AF_INET6
+    else:
+        print("Versão de IP não identificada, inserir 'v4' ou 'v6'")
+        return    
 
     running_server = True
     
     with socket.socket(AF, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('', PORT))
 
         while running_server:      
@@ -109,6 +114,11 @@ if __name__ == '__main__':
                     if not return_msg:
                         break
                     print(msg)
-                    print("return", return_msg)
+                    print(return_msg)
 
                     conn.sendall(return_msg.encode())
+
+
+if __name__ == '__main__':
+    main()
+    

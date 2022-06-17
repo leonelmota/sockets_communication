@@ -2,8 +2,6 @@ import socket
 import sys
 import ipaddress
 
-
-
 if __name__ == "__main__":
     HOST = sys.argv[1]
     PORT = int(sys.argv[2])
@@ -24,4 +22,4 @@ if __name__ == "__main__":
                 s.close()
                 break
             recv_msg = recv_data.decode()
-            print(f"received {recv_msg}")
+            print(f"{recv_msg}")
